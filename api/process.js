@@ -1,6 +1,6 @@
 export const config = {
   runtime: 'edge',
-  maxDuration: 45, // Increased duration slightly
+  maxDuration: 45,
 };
 
 export default async function handler(req) {
@@ -12,16 +12,15 @@ export default async function handler(req) {
     try {
       const audioBlob = await req.blob();
       const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
-      
-      // --- FIX #1: Using the CORRECT base URL from your working example ---
       const elevenLabsUrl = 'https://api.elevenlabs.io/v1/speech-to-text';
 
       const formData = new FormData();
-      formData.append('file', audioBlob, 'audio.mp3');
+      // --- THE FIX: We name the file correctly as .webm ---
+      formData.append('file', audioBlob, 'audio.webm');
       
-      // --- FIX #2: Sending the model_id INSIDE the form data, just like your working example ---
-      // We will use 'scribe_v1' as your example did. If this fails, your plan doesn't support it.
-      // If it fails again with "Not Found", REMOVE this line to use the default model.
+      // We will try using the 'scribe_v1' model as your example did.
+      // If this fails again with "Not Found", it means your plan doesn't support it.
+      // In that case, the only fix is to REMOVE the following line.
       formData.append('model_id', 'scribe_v1');
 
       const elevenLabsResponse = await fetch(elevenLabsUrl, {
@@ -41,7 +40,6 @@ export default async function handler(req) {
       const elevenLabsResult = await elevenLabsResponse.json();
       const rawText = elevenLabsResult.text || '';
 
-      // The Gemini part remains the same...
       const geminiApiKey = process.env.GEMINI_API_KEY;
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`;
       const prompt = `You are an expert AI editor. Your task is to take the following raw, transcribed text and clean it up. 1. Remove all filler words (like "um", "uh", "like", "you know", "so", "well", etc.). 2. Correct any grammatical mistakes and improve sentence structure. 3. Fix any false starts or repeated phrases. 4. Ensure the final text flows naturally and professionally, but KEEP THE ORIGINAL TONE AND MEANING. 5. Do not add any extra information or introductory phrases like "Here is the cleaned-up text:". Just provide the cleaned text directly. Raw Text: "${rawText}" Cleaned Text:`;
