@@ -12,7 +12,7 @@ export default async function handler(req) {
     try {
       const audioBlob = await req.blob();
       const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
-      const elevenLabsUrl = 'https://api.elevenlabs.io/v1/speech-to-text/scribe_v1/stream';
+      const elevenLabsUrl = 'https://api.elevenlabs.io/v1/speech-to-text/v1/stream';
 
       const elevenLabsResponse = await fetch(elevenLabsUrl, {
         method: 'POST',
@@ -59,3 +59,4 @@ export default async function handler(req) {
   }
   return new Response('Method Not Allowed', { status: 405 });
 }
+
