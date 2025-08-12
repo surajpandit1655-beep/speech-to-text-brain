@@ -3,21 +3,11 @@ export const config = {
   maxDuration: 30,
 };
 
-// This function now handles the CORS preflight request explicitly
 export default async function handler(req) {
-  // --- NEW: This block handles the "postcard" (preflight) request ---
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204, // No Content
-      headers: {
-        'Access-Control-Allow-Origin': '*', // Allow any origin
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, xi-api-key',
-      },
-    });
+    return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }});
   }
 
-  // This is the main logic for handling the audio file
   if (req.method === 'POST') {
     try {
       const audioBlob = await req.blob();
@@ -26,13 +16,19 @@ export default async function handler(req) {
 
       const elevenLabsResponse = await fetch(elevenLabsUrl, {
         method: 'POST',
-        headers: { 'xi-api-key': elevenLabsApiKey, 'Content-Type': 'audio/mpeg' },
+        headers: { 
+          'xi-api-key': elevenLabsApiKey, 
+          // --- THIS IS THE CRITICAL FIX ---
+          // The Content-Type now correctly matches what the browser sends.
+          'Content-Type': 'audio/webm' 
+        },
         body: audioBlob,
       });
 
       if (!elevenLabsResponse.ok) {
         const errorText = await elevenLabsResponse.text();
-        return new Response(`ElevenLabs API Error: ${errorText}`, { status: 500 });
+        // Send a more descriptive error back to the extension
+        return new Response(JSON.stringify({ error: `ElevenLabs API Error: ${errorText}` }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
       }
       
       const elevenLabsResult = await elevenLabsResponse.json();
@@ -49,32 +45,17 @@ export default async function handler(req) {
 
       if (!geminiResponse.ok) {
         const errorText = await geminiResponse.text();
-        return new Response(`Gemini API Error: ${errorText}`, { status: 500 });
+        return new Response(JSON.stringify({ error: `Gemini API Error: ${errorText}` }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
       }
 
       const geminiResult = await geminiResponse.json();
       const cleanedText = geminiResult.candidates[0].content.parts[0].text;
 
-      // When sending the final response, we also need the CORS header
-      return new Response(JSON.stringify({ cleanedText: cleanedText.trim() }), {
-        status: 200,
-        headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
+      return new Response(JSON.stringify({ cleanedText: cleanedText.trim() }), { status: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }});
 
     } catch (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
+      return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }});
     }
   }
-
-  // If the request is not OPTIONS or POST
   return new Response('Method Not Allowed', { status: 405 });
 }
