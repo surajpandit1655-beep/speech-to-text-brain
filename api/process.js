@@ -5,29 +5,35 @@ export const config = {
 
 export default async function handler(req) {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }});
+    return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, xi-api-key' }});
   }
 
   if (req.method === 'POST') {
     try {
       const audioBlob = await req.blob();
       const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
+      // We use the default model URL as it's available on all plans.
       const elevenLabsUrl = 'https://api.elevenlabs.io/v1/speech-to-text/v1/stream';
+
+      // --- THIS IS THE CRITICAL FIX ---
+      // We must send the audio inside a FormData object, like an email attachment.
+      const formData = new FormData();
+      // The API documentation specifies the field name must be 'file'.
+      formData.append('file', audioBlob, 'audio.webm');
 
       const elevenLabsResponse = await fetch(elevenLabsUrl, {
         method: 'POST',
-        headers: { 
-          'xi-api-key': elevenLabsApiKey, 
-          // --- THIS IS THE CRITICAL FIX ---
-          // The Content-Type now correctly matches what the browser sends.
-          'Content-Type': 'audio/webm' 
+        headers: {
+          'xi-api-key': elevenLabsApiKey,
+          // NOTE: We REMOVE the 'Content-Type' header here.
+          // The browser will automatically set it to 'multipart/form-data' when we send FormData.
         },
-        body: audioBlob,
+        // We send the FormData object as the body.
+        body: formData,
       });
 
       if (!elevenLabsResponse.ok) {
         const errorText = await elevenLabsResponse.text();
-        // Send a more descriptive error back to the extension
         return new Response(JSON.stringify({ error: `ElevenLabs API Error: ${errorText}` }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
       }
       
@@ -59,4 +65,3 @@ export default async function handler(req) {
   }
   return new Response('Method Not Allowed', { status: 405 });
 }
-
